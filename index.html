@@ -329,6 +329,7 @@
     <script>
         // State management
         let workbook = null;
+        let originalUploadedFilename = 'data'; // Default name
         let originalData = [];
         let filteredData = [];
         let headers = [];
@@ -378,7 +379,10 @@
             const file = event.target.files[0];
             if (!file) return;
 
+            // Store original filename without extension
+            originalUploadedFilename = file.name.split('.').slice(0, -1).join('.');
             fileNameSpan.textContent = file.name;
+            
             loader.style.display = 'block';
             dataControls.style.display = 'none';
             tableContainer.innerHTML = '';
@@ -567,19 +571,22 @@
         
         // --- Export Functions ---
 
+        function getExportFilename(extension) {
+            return `${originalUploadedFilename}_filtered.${extension}`;
+        }
+
         function exportData(format) {
             if (filteredData.length === 0) {
                 alert("Tidak ada data untuk diekspor.");
                 return;
             }
             
-            // Convert array of objects to array of arrays for SheetJS
             const dataToExport = [headers, ...filteredData.map(row => headers.map(header => row[header]))];
             const newWorksheet = XLSX.utils.aoa_to_sheet(dataToExport);
             
             if (format === 'json') {
                 const jsonString = JSON.stringify(filteredData, null, 2);
-                downloadBlob(jsonString, 'data.json', 'application/json');
+                downloadBlob(jsonString, getExportFilename('json'), 'application/json');
                 return;
             }
 
@@ -587,10 +594,10 @@
             XLSX.utils.book_append_sheet(newWorkbook, newWorksheet, 'FilteredData');
 
             if (format === 'xlsx') {
-                XLSX.writeFile(newWorkbook, 'filtered_data.xlsx');
+                XLSX.writeFile(newWorkbook, getExportFilename('xlsx'));
             } else if (format === 'csv') {
                 const csvString = XLSX.utils.sheet_to_csv(newWorksheet);
-                downloadBlob(csvString, 'filtered_data.csv', 'text/csv;charset=utf-8;');
+                downloadBlob(csvString, getExportFilename('csv'), 'text/csv;charset=utf-8;');
             }
         }
 
@@ -610,7 +617,7 @@
                 margin: { top: 10 }
             });
 
-            doc.save('filtered_data.pdf');
+            doc.save(getExportFilename('pdf'));
         }
         
         function exportToBase64() {
@@ -628,6 +635,8 @@
 
             preview.value = base64String;
             downloadLink.href = 'data:text/plain;base64,' + base64String;
+            downloadLink.download = getExportFilename('txt');
+            
             modal.style.display = 'block';
 
             closeBtn.onclick = () => { modal.style.display = 'none'; }
