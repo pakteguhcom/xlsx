@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Excel Data Viewer Profesional</title>
+    <title>Excel Data Finder Profesional</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.23/jspdf.plugin.autotable.min.js"></script>
@@ -299,7 +299,7 @@
 <body>
 
     <div class="container">
-        <h1>Excel Data Viewer</h1>
+        <h1>Excel Data Finder</h1>
 
         <div class="upload-section">
             <label for="file-upload" class="file-label">Pilih File Excel</label>
@@ -410,7 +410,6 @@
             const file = event.target.files[0];
             if (!file) return;
 
-            // Store original filename without extension
             originalUploadedFilename = file.name.split('.').slice(0, -1).join('.');
             fileNameSpan.textContent = file.name;
             
@@ -421,15 +420,25 @@
             const reader = new FileReader();
             reader.onload = (e) => {
                 try {
-                    const data = new UintArray(e.target.result);
+                    const data = new Uint8Array(e.target.result);
                     workbook = XLSX.read(data, { type: 'array' });
                     populateSheetSelector();
                     loader.style.display = 'none';
                     sheetSelector.style.display = 'inline-block';
-                    loadSheet(); // Auto-load first sheet
+                    loadSheet();
                 } catch (err) {
-                    console.error("Error reading file:", err);
-                    alert("Gagal membaca file. Pastikan format file benar (.xlsx atau .xls).");
+                    console.error("Error reading file:", err); // Log the full error to the console
+                    
+                    // === KODE YANG DIPERBARUI ===
+                    let userMessage = "Gagal membaca struktur file. Penyebab paling umum:\n\n" +
+                                      "1. File dilindungi password (tidak didukung).\n" +
+                                      "2. File bukan format Excel asli (Solusi: Buka di Excel lalu 'Save As' ke .xlsx).\n" +
+                                      "3. File mungkin rusak (corrupt).\n\n" +
+                                      "Detail error: " + err.message;
+
+                    alert(userMessage);
+                    // ============================
+                    
                     loader.style.display = 'none';
                 }
             };
@@ -476,7 +485,6 @@
             currentPage = 1;
             sortState = { column: null, direction: 'asc' };
             globalSearch.value = '';
-            // Clear column filters in the next render cycle
             setTimeout(() => {
                 document.querySelectorAll('.column-filter').forEach(input => input.value = '');
             }, 0);
@@ -490,32 +498,26 @@
                 query: input.value.toLowerCase()
             }));
 
-            // Apply filters
             if (globalQuery || columnFilters.some(f => f.query)) {
                 data = data.filter(row => {
                     const globalMatch = globalQuery ? Object.values(row).some(val => String(val).toLowerCase().includes(globalQuery)) : true;
-                    
                     const columnMatch = columnFilters.every(filter => {
                         if (!filter.query) return true;
                         return String(row[filter.header]).toLowerCase().includes(filter.query);
                     });
-                    
                     return globalMatch && columnMatch;
                 });
             }
 
-            // Apply sorting
             if (sortState.column) {
                 data.sort((a, b) => {
                     const valA = a[sortState.column];
                     const valB = b[sortState.column];
-                    
                     if (valA < valB) return sortState.direction === 'asc' ? -1 : 1;
                     if (valA > valB) return sortState.direction === 'asc' ? 1 : -1;
                     return 0;
                 });
             }
-            
             filteredData = data;
         }
 
@@ -525,8 +527,6 @@
             }
             
             const table = document.createElement('table');
-            
-            // Create Table Header
             const thead = table.createTHead();
             const headerRow = thead.insertRow();
             headers.forEach(header => {
@@ -534,7 +534,6 @@
                 th.textContent = header;
                 if (!forPrinting) {
                     th.onclick = () => handleSort(header);
-                    
                     let iconClass = 'fa-solid fa-sort';
                     if (sortState.column === header) {
                         th.className = sortState.direction === 'asc' ? 'sorted-asc' : 'sorted-desc';
@@ -545,7 +544,6 @@
                 headerRow.appendChild(th);
             });
             
-            // Create Column Filter Row (only if not for printing)
             if (!forPrinting) {
                 const filterRow = thead.insertRow();
                 headers.forEach(header => {
@@ -561,7 +559,6 @@
                 });
             }
 
-            // Create Table Body
             const tbody = table.createTBody();
             const dataToRender = forPrinting ? filteredData : filteredData.slice((currentPage - 1) * rowsPerPage, (currentPage - 1) * rowsPerPage + rowsPerPage);
 
@@ -573,15 +570,12 @@
                 });
             });
 
-            if (forPrinting) {
-                return table.outerHTML;
-            }
+            if (forPrinting) return table.outerHTML;
 
             tableContainer.innerHTML = '';
             tableContainer.appendChild(table);
             updatePagination();
         }
-
 
         function handleSort(column) {
             if (sortState.column === column) {
@@ -596,43 +590,32 @@
         function updatePagination() {
             const totalRows = filteredData.length;
             const totalPages = Math.ceil(totalRows / rowsPerPage);
-            
             if (totalRows === 0) {
                  pageInfo.textContent = "Tidak ada data ditemukan";
                  paginationNav.style.display = 'none';
                  return;
             }
-
             paginationNav.style.display = 'flex';
             pageInfo.textContent = `Halaman ${currentPage} dari ${totalPages} (${totalRows} baris)`;
             prevPageBtn.disabled = currentPage === 1;
             nextPageBtn.disabled = currentPage === totalPages;
         }
         
-        // --- Export and Print Functions ---
-
         function getExportFilename(extension) {
             return `${originalUploadedFilename}_filtered.${extension}`;
         }
 
         function exportData(format) {
-            if (filteredData.length === 0) {
-                alert("Tidak ada data untuk diekspor.");
-                return;
-            }
-            
+            if (filteredData.length === 0) { alert("Tidak ada data untuk diekspor."); return; }
             const dataToExport = [headers, ...filteredData.map(row => headers.map(header => row[header]))];
             const newWorksheet = XLSX.utils.aoa_to_sheet(dataToExport);
-            
             if (format === 'json') {
                 const jsonString = JSON.stringify(filteredData, null, 2);
                 downloadBlob(jsonString, getExportFilename('json'), 'application/json');
                 return;
             }
-
             const newWorkbook = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(newWorkbook, newWorksheet, 'FilteredData');
-
             if (format === 'xlsx') {
                 XLSX.writeFile(newWorkbook, getExportFilename('xlsx'));
             } else if (format === 'csv') {
@@ -642,56 +625,39 @@
         }
 
         function exportToPdf() {
-             if (filteredData.length === 0) {
-                alert("Tidak ada data untuk diekspor.");
-                return;
-            }
+             if (filteredData.length === 0) { alert("Tidak ada data untuk diekspor."); return; }
             const { jsPDF } = window.jspdf;
             const doc = new jsPDF({ orientation: 'landscape' });
-
             doc.autoTable({
                 head: [headers],
                 body: filteredData.map(row => headers.map(header => row[header])),
                 styles: { fontSize: 8 },
-                headStyles: { fillColor: [74, 144, 226] }, // primary color
+                headStyles: { fillColor: [74, 144, 226] },
                 margin: { top: 10 }
             });
-
             doc.save(getExportFilename('pdf'));
         }
         
         function exportToBase64() {
-             if (filteredData.length === 0) {
-                alert("Tidak ada data untuk diekspor.");
-                return;
-            }
+             if (filteredData.length === 0) { alert("Tidak ada data untuk diekspor."); return; }
             const jsonString = JSON.stringify(filteredData, null, 2);
             const base64String = btoa(unescape(encodeURIComponent(jsonString)));
-            
             const modal = document.getElementById('base64-modal');
             const preview = document.getElementById('base64-preview');
             const downloadLink = document.getElementById('download-base64');
             const closeBtn = document.querySelector('.close-button');
-
             preview.value = base64String;
             downloadLink.href = 'data:text/plain;base64,' + base64String;
             downloadLink.download = getExportFilename('txt');
-            
             modal.style.display = 'block';
-
             closeBtn.onclick = () => { modal.style.display = 'none'; }
             window.onclick = (event) => {
-                if (event.target == modal) {
-                    modal.style.display = 'none';
-                }
+                if (event.target == modal) { modal.style.display = 'none'; }
             }
         }
 
         function printTable() {
-            if (filteredData.length === 0) {
-                alert("Tidak ada data untuk dicetak.");
-                return;
-            }
+            if (filteredData.length === 0) { alert("Tidak ada data untuk dicetak."); return; }
             window.print();
         }
 
@@ -702,11 +668,10 @@
             a.href = url;
             a.download = fileName;
             document.body.appendChild(a);
-            a.click();
+a.click();
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
         }
-
     </script>
 </body>
 </html>
