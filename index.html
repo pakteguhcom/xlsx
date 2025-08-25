@@ -126,6 +126,8 @@
             background-color: #218838;
         }
 
+        .export-buttons button.print { background-color: #6c757d; }
+        .export-buttons button.print:hover { background-color: #5a6268; }
         .export-buttons button.pdf { background-color: #dc3545; }
         .export-buttons button.pdf:hover { background-color: #c82333; }
         .export-buttons button.json { background-color: #ffc107; color: #333; }
@@ -266,6 +268,32 @@
             font-size: 12px;
             margin-bottom: 15px;
         }
+
+        /* Print-specific Styles */
+        @media print {
+            body * {
+                visibility: hidden;
+            }
+            .table-container, .table-container * {
+                visibility: visible;
+            }
+            .table-container {
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 100%;
+            }
+            table {
+                font-size: 10pt;
+            }
+            th, td {
+                padding: 8px;
+            }
+            .column-filter {
+                display: none;
+            }
+        }
+
     </style>
 </head>
 <body>
@@ -299,6 +327,7 @@
                     <button class="pdf" id="export-pdf">Ekspor PDF</button>
                     <button class="json" id="export-json">Ekspor JSON</button>
                     <button class="base64" id="export-base64">Pratinjau Base64</button>
+                    <button class="print" id="print-btn">Cetak</button>
                 </div>
             </div>
 
@@ -372,6 +401,8 @@
         document.getElementById('export-pdf').addEventListener('click', exportToPdf);
         document.getElementById('export-json').addEventListener('click', () => exportData('json'));
         document.getElementById('export-base64').addEventListener('click', exportToBase64);
+        document.getElementById('print-btn').addEventListener('click', printTable);
+
 
         // --- Core Functions ---
 
@@ -390,7 +421,7 @@
             const reader = new FileReader();
             reader.onload = (e) => {
                 try {
-                    const data = new Uint8Array(e.target.result);
+                    const data = new UintArray(e.target.result);
                     workbook = XLSX.read(data, { type: 'array' });
                     populateSheetSelector();
                     loader.style.display = 'none';
@@ -488,8 +519,10 @@
             filteredData = data;
         }
 
-        function renderTable() {
-            applyFiltersAndSort();
+        function renderTable(forPrinting = false) {
+            if (!forPrinting) {
+                applyFiltersAndSort();
+            }
             
             const table = document.createElement('table');
             
@@ -499,38 +532,40 @@
             headers.forEach(header => {
                 const th = document.createElement('th');
                 th.textContent = header;
-                th.onclick = () => handleSort(header);
-                
-                let iconClass = 'fa-solid fa-sort';
-                if (sortState.column === header) {
-                    th.className = sortState.direction === 'asc' ? 'sorted-asc' : 'sorted-desc';
-                    iconClass = sortState.direction === 'asc' ? 'fa-solid fa-sort-up' : 'fa-solid fa-sort-down';
+                if (!forPrinting) {
+                    th.onclick = () => handleSort(header);
+                    
+                    let iconClass = 'fa-solid fa-sort';
+                    if (sortState.column === header) {
+                        th.className = sortState.direction === 'asc' ? 'sorted-asc' : 'sorted-desc';
+                        iconClass = sortState.direction === 'asc' ? 'fa-solid fa-sort-up' : 'fa-solid fa-sort-down';
+                    }
+                    th.innerHTML += ` <i class="sort-icon ${iconClass}"></i>`;
                 }
-                th.innerHTML += ` <i class="sort-icon ${iconClass}"></i>`;
                 headerRow.appendChild(th);
             });
             
-            // Create Column Filter Row
-            const filterRow = thead.insertRow();
-            headers.forEach(header => {
-                const td = document.createElement('td');
-                const input = document.createElement('input');
-                input.type = 'text';
-                input.placeholder = `Filter ${header}...`;
-                input.className = 'column-filter';
-                input.dataset.header = header;
-                input.oninput = () => { currentPage = 1; renderTable(); };
-                td.appendChild(input);
-                filterRow.appendChild(td);
-            });
+            // Create Column Filter Row (only if not for printing)
+            if (!forPrinting) {
+                const filterRow = thead.insertRow();
+                headers.forEach(header => {
+                    const td = document.createElement('td');
+                    const input = document.createElement('input');
+                    input.type = 'text';
+                    input.placeholder = `Filter ${header}...`;
+                    input.className = 'column-filter';
+                    input.dataset.header = header;
+                    input.oninput = () => { currentPage = 1; renderTable(); };
+                    td.appendChild(input);
+                    filterRow.appendChild(td);
+                });
+            }
 
             // Create Table Body
             const tbody = table.createTBody();
-            const startIndex = (currentPage - 1) * rowsPerPage;
-            const endIndex = startIndex + rowsPerPage;
-            const paginatedData = filteredData.slice(startIndex, endIndex);
+            const dataToRender = forPrinting ? filteredData : filteredData.slice((currentPage - 1) * rowsPerPage, (currentPage - 1) * rowsPerPage + rowsPerPage);
 
-            paginatedData.forEach(row => {
+            dataToRender.forEach(row => {
                 const tr = tbody.insertRow();
                 headers.forEach(header => {
                     const cell = tr.insertCell();
@@ -538,10 +573,15 @@
                 });
             });
 
+            if (forPrinting) {
+                return table.outerHTML;
+            }
+
             tableContainer.innerHTML = '';
             tableContainer.appendChild(table);
             updatePagination();
         }
+
 
         function handleSort(column) {
             if (sortState.column === column) {
@@ -569,7 +609,7 @@
             nextPageBtn.disabled = currentPage === totalPages;
         }
         
-        // --- Export Functions ---
+        // --- Export and Print Functions ---
 
         function getExportFilename(extension) {
             return `${originalUploadedFilename}_filtered.${extension}`;
@@ -607,7 +647,7 @@
                 return;
             }
             const { jsPDF } = window.jspdf;
-            const doc = new jsPDF();
+            const doc = new jsPDF({ orientation: 'landscape' });
 
             doc.autoTable({
                 head: [headers],
@@ -645,6 +685,14 @@
                     modal.style.display = 'none';
                 }
             }
+        }
+
+        function printTable() {
+            if (filteredData.length === 0) {
+                alert("Tidak ada data untuk dicetak.");
+                return;
+            }
+            window.print();
         }
 
         function downloadBlob(content, fileName, contentType) {
