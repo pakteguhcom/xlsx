@@ -246,12 +246,21 @@
   // ====== Utilities ======
   const debounce = (fn, ms=250) => { let t; return (...args) => { clearTimeout(t); t = setTimeout(()=>fn(...args), ms); }; };
   const normalize = (v) => (v==null? '': String(v));
+  // ✔️ FIX: escapeRegExp benar (meng-escape semua char spesial, termasuk \ dan ])
   const escapeRegExp = (s) => s.replace(/[.*+?^${}()|[\]\]/g, '\$&');
   const escapeHtml = (s) => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 
   function computeColumns(rows){ const set = new Set(); rows.forEach(r => Object.keys(r).forEach(k => set.add(k))); return Array.from(set); }
 
-  function highlight(text, q){ if(!q) return escapeHtml(text); const safe = escapeRegExp(q.trim()); if(!safe) return escapeHtml(text); const re = new RegExp(`(${safe})`, 'ig'); return escapeHtml(text).replace(re, '<mark>$1</mark>'); }
+  function highlight(text, q){
+    if(!q) return escapeHtml(text);
+    const safe = escapeRegExp(q.trim());
+    if(!safe) return escapeHtml(text);
+    try {
+      const re = new RegExp(`(${safe})`, 'ig');
+      return escapeHtml(text).replace(re, '<mark>$1</mark>');
+    } catch { return escapeHtml(text); }
+  }
 
   function compare(a,b){
     const na = parseFloat(a); const nb = parseFloat(b);
@@ -279,37 +288,21 @@
   function renderBody(){ applyFilters(); const { slice, total, pages } = paginate(filtered); el.statRows.textContent = original.length; el.statCols.textContent = columns.length; el.statFiltered.textContent = total; el.prev.disabled = page<=1; el.next.disabled = page>=pages; el.pageInfo.textContent = `Halaman ${pages? page:0} / ${pages}`; const q = el.q.value.trim(); const frag = document.createDocumentFragment(); el.tbody.innerHTML = ''; if(slice.length===0){ const tr = document.createElement('tr'); const td = document.createElement('td'); td.colSpan = Math.max(1, columns.length); td.style.color = 'var(--muted)'; td.textContent = original.length? 'Tidak ada data yang cocok dengan filter.' : 'Belum ada data.'; tr.appendChild(td); el.tbody.appendChild(tr); return; } slice.forEach(row => { const tr = document.createElement('tr'); columns.forEach(k => { const td = document.createElement('td'); const val = normalize(row[k]); td.className = 'highlight'; td.innerHTML = highlight(val, q); tr.appendChild(td); }); frag.appendChild(tr); }); el.tbody.appendChild(frag); }
 
   // ====== Loaders ======
-  async function loadWorkbookFromArrayBuffer(buf){
-    workbook = XLSX.read(buf, { type:'array', cellDates:true, cellText:false });
-    el.sheet.innerHTML = '';
-    workbook.SheetNames.forEach((name, i)=>{
-      const opt = document.createElement('option'); opt.value = name; opt.textContent = `${i+1}. ${name}`; el.sheet.appendChild(opt);
-    });
-    sheetName = workbook.SheetNames[0]; el.sheet.value = sheetName; await loadSheet(sheetName);
-  }
+  async function loadWorkbookFromArrayBuffer(buf){ workbook = XLSX.read(buf, { type:'array', cellDates:true, cellText:false }); el.sheet.innerHTML = ''; workbook.SheetNames.forEach((name, i)=>{ const opt = document.createElement('option'); opt.value = name; opt.textContent = `${i+1}. ${name}`; el.sheet.appendChild(opt); }); sheetName = workbook.SheetNames[0]; el.sheet.value = sheetName; await loadSheet(sheetName); }
 
-  async function loadWorkbookFromFile(file){
-    const buf = await file.arrayBuffer(); await loadWorkbookFromArrayBuffer(buf);
-  }
+  async function loadWorkbookFromFile(file){ const buf = await file.arrayBuffer(); await loadWorkbookFromArrayBuffer(buf); }
 
-  async function loadSheet(name){
-    const ws = workbook.Sheets[name];
-    const rows = XLSX.utils.sheet_to_json(ws, { defval:'', raw:false });
-    original = rows; columns = computeColumns(rows); sheetName = name;
-    renderHeader(); renderFilters(); page = 1; renderBody(); enableUI(true);
-  }
+  async function loadSheet(name){ const ws = workbook.Sheets[name]; const rows = XLSX.utils.sheet_to_json(ws, { defval:'', raw:false }); original = rows; columns = computeColumns(rows); sheetName = name; renderHeader(); renderFilters(); page = 1; renderBody(); enableUI(true); }
 
   // ------- URL Loader (XLSX / Google Drive / Google Sheets) -------
   function buildDirectExcelUrl(url){
     try{
       const u = new URL(url);
-      // Google Drive file: /file/d/ID/
       if(u.hostname.includes('drive.google.com')){
         const m = u.pathname.match(/\/file\/d\/([^/]+)\//);
         const id = m? m[1] : (u.searchParams.get('id')||'');
         if(id) return `https://drive.google.com/uc?export=download&id=${id}`;
       }
-      // Google Sheets: /spreadsheets/d/ID/
       if(u.hostname.includes('docs.google.com') && u.pathname.includes('/spreadsheets/')){
         const m = u.pathname.match(/\/spreadsheets\/d\/([^/]+)/);
         const id = m? m[1] : '';
@@ -349,14 +342,12 @@
   function exportBase64(){ const wb = exportWorkbookFrom(filtered); const b64 = XLSX.write(wb, { bookType:'xlsx', type:'base64' }); el.b64Preview.textContent = b64.slice(0, 2000) + (b64.length>2000? '
 … (dipotong)':''); el.downloadB64.onclick = () => { download(`export_${(sheetName||'data')}.b64.txt`, 'text/plain;charset=utf-8', b64); }; el.copyB64.onclick = async () => { try { await navigator.clipboard.writeText(b64); toast('Base64 disalin ✅'); } catch(e){ toast('Gagal menyalin 😕'); } }; openModal(); }
 
-  // ------- Export PDF (jsPDF + autoTable) -------
   function exportPdf(){
     if(!filtered.length){ toast('Tidak ada data untuk diekspor'); return; }
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF({ orientation:'landscape', unit:'pt', format:'a4' });
     const title = `Export ${(sheetName||'Data')} — ${new Date().toLocaleString('id-ID')}`;
     doc.setFontSize(14); doc.text(title, 40, 40);
-    const head = [columns];
     const body = filtered.map(row => columns.map(k => normalize(row[k])));
     const pageW = doc.internal.pageSize.getWidth();
 
@@ -367,7 +358,7 @@
       styles:{ fontSize:8, cellPadding:3, overflow:'linebreak' },
       headStyles:{ fillColor:[15,23,42], textColor:255 },
       margin:{ left:40, right:40 },
-      didDrawPage: (data)=>{
+      didDrawPage: ()=>{
         const str = `Halaman ${doc.internal.getNumberOfPages()}`;
         doc.setFontSize(9);
         doc.text(str, pageW - 40, doc.internal.pageSize.getHeight() - 20, { align:'right' });
@@ -377,7 +368,6 @@
     doc.save(`export_${(sheetName||'data')}.pdf`);
   }
 
-  // ------- Print (native print → save as PDF) -------
   function printPdf(){ window.print(); }
 
   // ====== Modal ======
@@ -399,10 +389,7 @@
     catch(err){ console.error(err); toast('Gagal memuat file. Pastikan file tidak rusak.'); enableUI(false); }
   });
 
-  el.loadUrlBtn.addEventListener('click', async ()=>{
-    const url = el.url.value.trim(); if(!url){ toast('Tempel URL terlebih dahulu'); return; }
-    await loadFromUrl(url);
-  });
+  el.loadUrlBtn.addEventListener('click', async ()=>{ const url = el.url.value.trim(); if(!url){ toast('Tempel URL terlebih dahulu'); return; } await loadFromUrl(url); });
   el.url.addEventListener('keydown', async (ev)=>{ if(ev.key==='Enter'){ ev.preventDefault(); const url = el.url.value.trim(); if(url) await loadFromUrl(url); }});
 
   el.sheet.addEventListener('change', async (e)=>{ const name = e.target.value; if(!name) return; page=1; currentSort={key:null, dir:'asc'}; await loadSheet(name); });
@@ -427,7 +414,6 @@
   el.printPdf.addEventListener('click', printPdf);
   el.exportB64.addEventListener('click', exportBase64);
 
-  // Keyboard: PgUp/PgDn untuk paging cepat
   window.addEventListener('keydown', (ev)=>{
     if(!filtered.length) return;
     if(ev.key==='PageDown'){ ev.preventDefault(); if(!el.next.disabled){ page++; renderBody(); } }
