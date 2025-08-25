@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Excel Data Finder Profesional</title>
+    <title>Excel Data Viewer Profesional</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.23/jspdf.plugin.autotable.min.js"></script>
@@ -36,6 +36,25 @@
             padding: 25px;
             border-radius: 12px;
             box-shadow: var(--shadow);
+            position: relative;
+        }
+        
+        #info-btn {
+            position: absolute;
+            top: 25px;
+            right: 25px;
+            background: none;
+            border: 1px solid var(--primary-color);
+            color: var(--primary-color);
+            padding: 8px 12px;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        #info-btn:hover {
+            background-color: var(--primary-color);
+            color: white;
         }
 
         h1 {
@@ -218,7 +237,7 @@
             color: #555;
         }
 
-        /* Modal untuk Base64 */
+        /* Modal Styles */
         .modal {
             display: none;
             position: fixed;
@@ -233,12 +252,13 @@
         .modal-content {
             background-color: #fefefe;
             margin: 10% auto;
-            padding: 20px;
+            padding: 25px;
             border: 1px solid #888;
             width: 80%;
             max-width: 800px;
             border-radius: 8px;
             box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+            line-height: 1.8;
         }
         .modal-header {
             display: flex;
@@ -269,6 +289,31 @@
             margin-bottom: 15px;
         }
 
+        .modal-content h3 {
+            color: var(--primary-color);
+            border-bottom: 2px solid var(--secondary-color);
+            padding-bottom: 5px;
+            margin-top: 20px;
+        }
+
+        .modal-content ul {
+            list-style-type: disc;
+            padding-left: 20px;
+        }
+        
+        .modal-content li {
+            margin-bottom: 10px;
+        }
+
+        .developer-info {
+            margin-top: 30px;
+            border-top: 1px solid #eee;
+            padding-top: 20px;
+            text-align: center;
+            font-size: 0.9em;
+            color: #555;
+        }
+
         /* Print-specific Styles */
         @media print {
             body * {
@@ -293,13 +338,13 @@
                 display: none;
             }
         }
-
     </style>
 </head>
 <body>
 
     <div class="container">
-        <h1>Excel Data Finder</h1>
+        <button id="info-btn"><i class="fa-solid fa-circle-info"></i> Info & Bantuan</button>
+        <h1>Excel Data Viewer</h1>
 
         <div class="upload-section">
             <label for="file-upload" class="file-label">Pilih File Excel</label>
@@ -347,10 +392,44 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h2>Pratinjau & Unduh Base64 (JSON)</h2>
-                <span class="close-button">&times;</span>
+                <span class="close-button" data-modal="base64-modal">&times;</span>
             </div>
             <textarea id="base64-preview" readonly></textarea>
             <a id="download-base64" class="file-label" download="data.txt">Unduh File .txt</a>
+        </div>
+    </div>
+    
+    <div id="info-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2><i class="fa-solid fa-circle-info"></i> Informasi & Petunjuk Penggunaan</h2>
+                <span class="close-button" data-modal="info-modal">&times;</span>
+            </div>
+            
+            <h3><i class="fa-solid fa-book-open"></i> Petunjuk Penggunaan</h3>
+            <ul>
+                <li><strong>Unggah File:</strong> Klik tombol "Pilih File Excel" untuk mengunggah file dengan format <code>.xlsx</code> atau <code>.xls</code> dari komputer Anda.</li>
+                <li><strong>Pilih Sheet:</strong> Jika file memiliki lebih dari satu sheet, sebuah menu dropdown akan muncul untuk memilih sheet yang ingin ditampilkan.</li>
+                <li><strong>Pencarian Global:</strong> Gunakan kotak "Cari di semua kolom..." untuk mencari data secara cepat di seluruh isi tabel.</li>
+                <li><strong>Filter per Kolom:</strong> Untuk pencarian yang lebih spesifik, ketik kata kunci di kotak filter yang berada tepat di bawah setiap judul kolom.</li>
+                <li><strong>Sortir Data:</strong> Klik pada judul kolom untuk mengurutkan data di kolom tersebut (A-Z). Klik sekali lagi untuk mengurutkan sebaliknya (Z-A).</li>
+                <li><strong>Pagination:</strong> Atur jumlah baris yang ditampilkan per halaman (10, 25, 50, 100, 250) dan gunakan tombol "Sebelumnya" / "Berikutnya" untuk navigasi.</li>
+                <li><strong>Ekspor & Cetak:</strong> Gunakan tombol-tombol di kanan atas untuk mengekspor data yang sudah terfilter ke berbagai format (XLSX, CSV, PDF, JSON, Base64) atau untuk mencetak tampilan tabel saat ini.</li>
+            </ul>
+
+            <h3><i class="fa-solid fa-triangle-exclamation"></i> Tips & Troubleshooting</h3>
+            <ul>
+                <li>Jika Anda mendapat pesan error saat mengunggah, kemungkinan besar file tersebut dilindungi password atau bukan format Excel standar. Coba buka file di Microsoft Excel, lalu <strong>"Simpan Sebagai" (Save As)</strong> ke format <strong>Excel Workbook (*.xlsx)</strong>, kemudian unggah kembali file yang baru disimpan tersebut.</li>
+                <li>Aplikasi ini berjalan sepenuhnya di browser Anda. Tidak ada data yang diunggah ke server, sehingga privasi Anda terjamin.</li>
+            </ul>
+
+            <div class="developer-info">
+                <p><strong>Dikembangkan oleh:</strong> Pak Teguh</p>
+                <p>
+                    <a href="mailto:admin@pakteguh.com">admin@pakteguh.com</a> | 
+                    <a href="http://www.pakteguh.com" target="_blank" rel="noopener noreferrer">www.pakteguh.com</a>
+                </p>
+            </div>
         </div>
     </div>
 
@@ -400,9 +479,25 @@
         document.getElementById('export-csv').addEventListener('click', () => exportData('csv'));
         document.getElementById('export-pdf').addEventListener('click', exportToPdf);
         document.getElementById('export-json').addEventListener('click', () => exportData('json'));
-        document.getElementById('export-base64').addEventListener('click', exportToBase64);
+        document.getElementById('export-base64').addEventListener('click', showBase64Modal);
         document.getElementById('print-btn').addEventListener('click', printTable);
 
+        // Modal Logic
+        document.getElementById('info-btn').addEventListener('click', () => {
+            document.getElementById('info-modal').style.display = 'block';
+        });
+
+        document.querySelectorAll('.close-button').forEach(button => {
+            button.onclick = () => {
+                document.getElementById(button.dataset.modal).style.display = 'none';
+            }
+        });
+        
+        window.onclick = (event) => {
+            if (event.target.classList.contains('modal')) {
+                event.target.style.display = 'none';
+            }
+        }
 
         // --- Core Functions ---
 
@@ -427,18 +522,13 @@
                     sheetSelector.style.display = 'inline-block';
                     loadSheet();
                 } catch (err) {
-                    console.error("Error reading file:", err); // Log the full error to the console
-                    
-                    // === KODE YANG DIPERBARUI ===
+                    console.error("Error reading file:", err);
                     let userMessage = "Gagal membaca struktur file. Penyebab paling umum:\n\n" +
                                       "1. File dilindungi password (tidak didukung).\n" +
                                       "2. File bukan format Excel asli (Solusi: Buka di Excel lalu 'Save As' ke .xlsx).\n" +
                                       "3. File mungkin rusak (corrupt).\n\n" +
                                       "Detail error: " + err.message;
-
                     alert(userMessage);
-                    // ============================
-                    
                     loader.style.display = 'none';
                 }
             };
@@ -638,22 +728,17 @@
             doc.save(getExportFilename('pdf'));
         }
         
-        function exportToBase64() {
+        function showBase64Modal() {
              if (filteredData.length === 0) { alert("Tidak ada data untuk diekspor."); return; }
             const jsonString = JSON.stringify(filteredData, null, 2);
             const base64String = btoa(unescape(encodeURIComponent(jsonString)));
             const modal = document.getElementById('base64-modal');
             const preview = document.getElementById('base64-preview');
             const downloadLink = document.getElementById('download-base64');
-            const closeBtn = document.querySelector('.close-button');
             preview.value = base64String;
             downloadLink.href = 'data:text/plain;base64,' + base64String;
             downloadLink.download = getExportFilename('txt');
             modal.style.display = 'block';
-            closeBtn.onclick = () => { modal.style.display = 'none'; }
-            window.onclick = (event) => {
-                if (event.target == modal) { modal.style.display = 'none'; }
-            }
         }
 
         function printTable() {
@@ -668,7 +753,7 @@
             a.href = url;
             a.download = fileName;
             document.body.appendChild(a);
-a.click();
+            a.click();
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
         }
