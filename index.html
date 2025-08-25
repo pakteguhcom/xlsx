@@ -1,0 +1,439 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Excel Finder — Pencarian Data XLSX</title>
+  <link rel="icon" href="data:," />
+  <!-- Dependensi utama -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <!-- Export PDF -->
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
+  <style>
+    :root{
+      --bg:#0f172a;          /* slate-900 */
+      --panel:#111827;       /* gray-900 */
+      --muted:#94a3b8;       /* slate-400 */
+      --text:#e5e7eb;        /* gray-200 */
+      --primary:#22d3ee;     /* cyan-400 */
+      --accent:#a78bfa;      /* violet-400 */
+      --danger:#f87171;      /* red-400 */
+      --ok:#34d399;          /* emerald-400 */
+      --border:#1f2937;      /* gray-800 */
+      --chip:#0b1222;        /* darker */
+      --mark:#fde68a;        /* amber-200 */
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0; background:linear-gradient(180deg, #0b1222, var(--bg));
+      color:var(--text); font:14px/1.5 system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
+    }
+    .container{max-width:1200px; margin:24px auto; padding:0 16px}
+    .card{background:rgba(17,24,39,.8); border:1px solid var(--border); border-radius:16px; box-shadow:0 10px 30px rgba(0,0,0,.35)}
+    .header{display:flex; gap:12px; align-items:center; justify-content:space-between; padding:18px 20px; border-bottom:1px solid var(--border)}
+    .title{display:flex; gap:10px; align-items:center}
+    .title .dot{width:10px; height:10px; background:var(--primary); border-radius:999px; box-shadow:0 0 20px var(--primary)}
+    h1{margin:0; font-size:18px; letter-spacing:.5px}
+    .controls{display:flex; flex-wrap:wrap; gap:10px}
+    .control{display:flex; align-items:center; gap:8px; background:var(--chip); border:1px solid var(--border); border-radius:12px; padding:8px 10px}
+    .control input[type="file"]{max-width:260px}
+    input, select, button{color:var(--text)}
+    input[type="text"], input[type="url"], select{
+      background:#0a1220; border:1px solid var(--border); border-radius:10px; padding:8px 10px; outline:0; min-width:160px
+    }
+    input[type="text"]::placeholder, input[type="url"]::placeholder{color:#64748b}
+    button{background:#0a1220; border:1px solid var(--border); border-radius:10px; padding:8px 12px; cursor:pointer}
+    button:hover{border-color:#334155}
+    .btn-primary{background:linear-gradient(135deg, rgba(34,211,238,.15), rgba(167,139,250,.12)); border-color:#334155}
+    .btn-danger{border-color:#7f1d1d}
+
+    .body{padding:16px 20px}
+    .grid{display:grid; grid-template-columns:1fr; gap:14px}
+
+    .toolbar{display:flex; flex-wrap:wrap; gap:10px; align-items:center}
+    .spacer{flex:1}
+    .stat{display:flex; gap:8px; align-items:center; color:var(--muted); font-size:12px}
+    .stat b{color:var(--text)}
+
+    .filters{display:grid; gap:8px; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr))}
+    .filter-item{display:flex; flex-direction:column; gap:6px}
+    .filter-item label{font-size:12px; color:var(--muted)}
+
+    table{width:100%; border-collapse:separate; border-spacing:0; overflow:auto; border-radius:12px; border:1px solid var(--border)}
+    thead th{position:sticky; top:0; background:#0b1222; text-align:left; font-weight:600; padding:10px 12px; border-bottom:1px solid var(--border); white-space:nowrap}
+    tbody td{padding:10px 12px; border-bottom:1px solid var(--border); vertical-align:top}
+    tbody tr:nth-child(even){background:rgba(255,255,255,.02)}
+    .th-sort{display:inline-flex; align-items:center; gap:6px; cursor:pointer}
+    .th-sort .arrow{opacity:.5; font-size:12px}
+    .th-sort[data-dir="asc"] .arrow::after{content:"▲"}
+    .th-sort[data-dir="desc"] .arrow::after{content:"▼"}
+
+    .highlight mark{background:var(--mark); color:#111827; padding:0 2px; border-radius:3px}
+
+    .pagination{display:flex; flex-wrap:wrap; gap:10px; align-items:center; justify-content:flex-end}
+
+    .badge{display:inline-flex; align-items:center; gap:6px; font-size:12px; color:var(--muted); background:var(--chip); border:1px solid var(--border); padding:6px 8px; border-radius:10px}
+
+    .exports{display:flex; flex-wrap:wrap; gap:8px}
+
+    /* Modal Base64 */
+    .modal{position:fixed; inset:0; display:none; align-items:center; justify-content:center; backdrop-filter:blur(3px); background:rgba(2,6,23,.55); z-index:50}
+    .modal.active{display:flex}
+    .modal-card{width:min(900px,calc(100% - 32px)); background:var(--panel); border:1px solid var(--border); border-radius:14px; overflow:hidden; box-shadow:0 20px 60px rgba(0,0,0,.5)}
+    .modal-head{display:flex; align-items:center; justify-content:space-between; padding:12px 14px; border-bottom:1px solid var(--border)}
+    .modal-body{padding:10px 14px}
+    .mono{font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-size:12px; white-space:pre-wrap; word-break:break-all; max-height:55vh; overflow:auto; background:#0a1220; border:1px solid var(--border); border-radius:10px; padding:10px}
+
+    @media (max-width:700px){
+      .controls{gap:6px}
+      .control{padding:6px 8px}
+      .toolbar{gap:8px}
+      .pagination{justify-content:center}
+    }
+
+    /* Print view for PDF via ctrl/cmd+P */
+    @media print {
+      body{background:white; color:black}
+      .card{box-shadow:none; border:none}
+      .header, .toolbar, .pagination, #hint, .modal{display:none !important}
+      table{border-color:#ddd}
+      thead th{background:#f5f5f5; -webkit-print-color-adjust:exact; print-color-adjust:exact}
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="card">
+      <div class="header">
+        <div class="title"><span class="dot"></span><h1>Excel Finder — Pencarian Data dari XLSX</h1></div>
+        <div class="controls">
+          <label class="control" title="Unggah file Excel (.xlsx / .xls)">
+            <strong>📄 File:</strong>
+            <input id="fileInput" type="file" accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel">
+          </label>
+          <label class="control" title="Tempel URL (.xlsx) atau Google Drive/Sheets">
+            <strong>🔗 URL:</strong>
+            <input id="urlInput" type="url" placeholder="https://… (XLSX / Google Drive / Google Sheets)" style="min-width:320px" />
+            <button id="loadUrlBtn" class="btn-primary">Muat</button>
+          </label>
+          <label class="control" title="Pilih sheet">
+            <strong>📑 Sheet:</strong>
+            <select id="sheetSelect" disabled></select>
+          </label>
+          <button id="resetBtn" class="btn-danger" title="Kosongkan data" disabled>♻️ Reset</button>
+        </div>
+      </div>
+
+      <div class="body">
+        <div class="grid">
+          <div class="toolbar">
+            <input id="q" type="text" placeholder="🔎 Pencarian global (cari di semua kolom)…" disabled aria-label="Pencarian">
+            <div class="exports">
+              <button id="exportXlsx" class="btn-primary" disabled>⬇️ Ekspor XLSX</button>
+              <button id="exportCsv" disabled>⬇️ Ekspor CSV</button>
+              <button id="exportJson" disabled>⬇️ Ekspor JSON</button>
+              <button id="exportPdf" disabled>⬇️ Ekspor PDF</button>
+              <button id="printPdf" disabled>🖨️ Cetak / Simpan PDF</button>
+              <button id="exportB64" disabled>🔐 Base64</button>
+            </div>
+            <span class="spacer"></span>
+            <div class="badge" title="Ringkasan">
+              <span>Baris: <b id="statRows">0</b></span>
+              <span>•</span>
+              <span>Kolom: <b id="statCols">0</b></span>
+              <span>•</span>
+              <span>Terfilter: <b id="statFiltered">0</b></span>
+            </div>
+          </div>
+
+          <div id="colFilters" class="filters"></div>
+
+          <div class="table-wrap">
+            <table id="dataTable" aria-live="polite">
+              <thead><tr id="theadRow"></tr></thead>
+              <tbody id="tbody"></tbody>
+            </table>
+          </div>
+
+          <div class="pagination">
+            <label>Baris/halaman:
+              <select id="pageSize" disabled>
+                <option>10</option>
+                <option>25</option>
+                <option selected>50</option>
+                <option>100</option>
+                <option>250</option>
+              </select>
+            </label>
+            <button id="prev" disabled>◀️ Sebelumnya</button>
+            <span id="pageInfo" class="badge">Halaman 0 / 0</span>
+            <button id="next" disabled>Berikutnya ▶️</button>
+          </div>
+
+          <p id="hint" style="color:var(--muted); margin:6px 4px 0">
+            Tips: bisa unggah file, atau tempel URL (mendukung Google Drive / Google Sheets → otomatis jadi tautan unduhan). Jika gagal karena CORS, lihat pesan yang muncul untuk solusinya.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Base64 -->
+  <div id="modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <div class="modal-card">
+      <div class="modal-head">
+        <strong id="modalTitle">Pratinjau Base64 (XLSX)</strong>
+        <div style="display:flex; gap:8px">
+          <button id="copyB64">📋 Salin</button>
+          <button id="downloadB64" class="btn-primary">⬇️ Unduh .b64</button>
+          <button id="closeModal">✖️ Tutup</button>
+        </div>
+      </div>
+      <div class="modal-body">
+        <div id="b64Preview" class="mono"></div>
+        <p style="color:var(--muted); margin-top:8px">Catatan: Ditampilkan hanya sebagian awal (maks 2000 karakter) agar tetap ringan. File unduhan berisi seluruh string Base64.</p>
+      </div>
+    </div>
+  </div>
+
+<script>
+(function(){
+  // ====== State ======
+  let workbook = null;
+  let sheetName = null;
+  let original = [];     // Array of objects
+  let columns = [];      // Ordered array of keys
+  let filtered = [];
+  let currentSort = { key: null, dir: 'asc' }; // 'asc' | 'desc'
+  let page = 1;
+  let pageSize = 50;
+
+  // ====== Elements ======
+  const $ = (q) => document.querySelector(q);
+  const $$ = (q) => Array.from(document.querySelectorAll(q));
+  const el = {
+    file: $('#fileInput'),
+    url: $('#urlInput'),
+    loadUrlBtn: $('#loadUrlBtn'),
+    sheet: $('#sheetSelect'),
+    reset: $('#resetBtn'),
+    q: $('#q'),
+    colFilters: $('#colFilters'),
+    thead: $('#theadRow'),
+    tbody: $('#tbody'),
+    pageSize: $('#pageSize'),
+    prev: $('#prev'),
+    next: $('#next'),
+    pageInfo: $('#pageInfo'),
+    statRows: $('#statRows'),
+    statCols: $('#statCols'),
+    statFiltered: $('#statFiltered'),
+    exportXlsx: $('#exportXlsx'),
+    exportCsv: $('#exportCsv'),
+    exportJson: $('#exportJson'),
+    exportPdf: $('#exportPdf'),
+    printPdf: $('#printPdf'),
+    exportB64: $('#exportB64'),
+    modal: $('#modal'),
+    b64Preview: $('#b64Preview'),
+    copyB64: $('#copyB64'),
+    downloadB64: $('#downloadB64'),
+    closeModal: $('#closeModal'),
+  };
+
+  // ====== Utilities ======
+  const debounce = (fn, ms=250) => { let t; return (...args) => { clearTimeout(t); t = setTimeout(()=>fn(...args), ms); }; };
+  const normalize = (v) => (v==null? '': String(v));
+  const escapeRegExp = (s) => s.replace(/[.*+?^${}()|[\]\]/g, '\$&');
+  const escapeHtml = (s) => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+  function computeColumns(rows){ const set = new Set(); rows.forEach(r => Object.keys(r).forEach(k => set.add(k))); return Array.from(set); }
+
+  function highlight(text, q){ if(!q) return escapeHtml(text); const safe = escapeRegExp(q.trim()); if(!safe) return escapeHtml(text); const re = new RegExp(`(${safe})`, 'ig'); return escapeHtml(text).replace(re, '<mark>$1</mark>'); }
+
+  function compare(a,b){
+    const na = parseFloat(a); const nb = parseFloat(b);
+    if(!Number.isNaN(na) && !Number.isNaN(nb)) return na-nb;
+    const da = Date.parse(a); const db = Date.parse(b);
+    if(!Number.isNaN(da) && !Number.isNaN(db)) return da-db;
+    return String(a).localeCompare(String(b), 'id', { sensitivity:'base' });
+  }
+
+  function paginate(arr){ const total = arr.length; const pages = Math.max(1, Math.ceil(total / pageSize)); if(page>pages) page = pages; const start = (page-1) * pageSize; const end = start + pageSize; return { slice: arr.slice(start, end), total, pages }; }
+
+  function enableUI(enabled){ [el.sheet, el.reset, el.q, el.exportXlsx, el.exportCsv, el.exportJson, el.exportPdf, el.printPdf, el.exportB64, el.pageSize, el.prev, el.next].forEach(x=> x.disabled = !enabled); }
+
+  function setLoading(msg='Memuat data…'){ el.tbody.innerHTML = `<tr><td style="color:var(--muted)" colspan="99">${msg}</td></tr>`; }
+
+  // ====== Rendering ======
+  function renderHeader(){ el.thead.innerHTML = ''; const frag = document.createDocumentFragment(); columns.forEach(col => { const th = document.createElement('th'); const wrap = document.createElement('span'); wrap.className = 'th-sort'; wrap.dataset.key = col; wrap.dataset.dir = (currentSort.key===col? currentSort.dir : ''); wrap.innerHTML = `<span>${escapeHtml(col)}</span> <span class="arrow"></span>`; wrap.addEventListener('click', ()=>{ if(currentSort.key===col){ currentSort.dir = (currentSort.dir==='asc'?'desc':'asc'); } else { currentSort.key = col; currentSort.dir = 'asc'; } page = 1; renderBody(); }); th.appendChild(wrap); frag.appendChild(th); }); el.thead.appendChild(frag); }
+
+  function renderFilters(){ el.colFilters.innerHTML = ''; const frag = document.createDocumentFragment(); columns.forEach(col => { const wrap = document.createElement('div'); wrap.className = 'filter-item'; wrap.innerHTML = `<label>${escapeHtml(col)}</label><input type="text" data-col="${escapeHtml(col)}" placeholder="Filter kolom…" />`; frag.appendChild(wrap); }); el.colFilters.appendChild(frag); $$('#colFilters input').forEach(inp=>{ inp.addEventListener('input', debounce(()=>{ page=1; renderBody(); })); }); }
+
+  function getActiveFilters(){ const f = {}; $$('#colFilters input').forEach(inp=>{ const v = inp.value.trim(); if(v) f[inp.dataset.col] = v; }); return f; }
+
+  function applyFilters(){ const q = el.q.value.trim().toLowerCase(); const per = getActiveFilters(); let out = original.filter(row => { for(const [k, v] of Object.entries(per)){ const cell = normalize(row[k]).toLowerCase(); if(!cell.includes(v.toLowerCase())) return false; } if(!q) return true; return columns.some(k => normalize(row[k]).toLowerCase().includes(q)); }); if(currentSort.key){ const key = currentSort.key; const dir = currentSort.dir==='asc'? 1 : -1; out.sort((r1,r2)=> dir * compare(normalize(r1[key]), normalize(r2[key]))); } filtered = out; }
+
+  function renderBody(){ applyFilters(); const { slice, total, pages } = paginate(filtered); el.statRows.textContent = original.length; el.statCols.textContent = columns.length; el.statFiltered.textContent = total; el.prev.disabled = page<=1; el.next.disabled = page>=pages; el.pageInfo.textContent = `Halaman ${pages? page:0} / ${pages}`; const q = el.q.value.trim(); const frag = document.createDocumentFragment(); el.tbody.innerHTML = ''; if(slice.length===0){ const tr = document.createElement('tr'); const td = document.createElement('td'); td.colSpan = Math.max(1, columns.length); td.style.color = 'var(--muted)'; td.textContent = original.length? 'Tidak ada data yang cocok dengan filter.' : 'Belum ada data.'; tr.appendChild(td); el.tbody.appendChild(tr); return; } slice.forEach(row => { const tr = document.createElement('tr'); columns.forEach(k => { const td = document.createElement('td'); const val = normalize(row[k]); td.className = 'highlight'; td.innerHTML = highlight(val, q); tr.appendChild(td); }); frag.appendChild(tr); }); el.tbody.appendChild(frag); }
+
+  // ====== Loaders ======
+  async function loadWorkbookFromArrayBuffer(buf){
+    workbook = XLSX.read(buf, { type:'array', cellDates:true, cellText:false });
+    el.sheet.innerHTML = '';
+    workbook.SheetNames.forEach((name, i)=>{
+      const opt = document.createElement('option'); opt.value = name; opt.textContent = `${i+1}. ${name}`; el.sheet.appendChild(opt);
+    });
+    sheetName = workbook.SheetNames[0]; el.sheet.value = sheetName; await loadSheet(sheetName);
+  }
+
+  async function loadWorkbookFromFile(file){
+    const buf = await file.arrayBuffer(); await loadWorkbookFromArrayBuffer(buf);
+  }
+
+  async function loadSheet(name){
+    const ws = workbook.Sheets[name];
+    const rows = XLSX.utils.sheet_to_json(ws, { defval:'', raw:false });
+    original = rows; columns = computeColumns(rows); sheetName = name;
+    renderHeader(); renderFilters(); page = 1; renderBody(); enableUI(true);
+  }
+
+  // ------- URL Loader (XLSX / Google Drive / Google Sheets) -------
+  function buildDirectExcelUrl(url){
+    try{
+      const u = new URL(url);
+      // Google Drive file: /file/d/ID/
+      if(u.hostname.includes('drive.google.com')){
+        const m = u.pathname.match(/\/file\/d\/([^/]+)\//);
+        const id = m? m[1] : (u.searchParams.get('id')||'');
+        if(id) return `https://drive.google.com/uc?export=download&id=${id}`;
+      }
+      // Google Sheets: /spreadsheets/d/ID/
+      if(u.hostname.includes('docs.google.com') && u.pathname.includes('/spreadsheets/')){
+        const m = u.pathname.match(/\/spreadsheets\/d\/([^/]+)/);
+        const id = m? m[1] : '';
+        if(id) return `https://docs.google.com/spreadsheets/d/${id}/export?format=xlsx`;
+      }
+      return url; // asumsi sudah direct link .xlsx
+    }catch{ return url; }
+  }
+
+  async function loadFromUrl(url){
+    const direct = buildDirectExcelUrl(url);
+    enableUI(false); setLoading('Mengunduh dari URL…');
+    try{
+      const resp = await fetch(direct);
+      if(!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const buf = await resp.arrayBuffer();
+      await loadWorkbookFromArrayBuffer(buf);
+      toast('Berhasil memuat dari URL ✅');
+    }catch(err){
+      console.error(err);
+      toast('Gagal memuat dari URL. Jika ini tautan Google Drive/Sheets, pastikan aksesnya "Anyone with the link" & coba lagi. Jika masih gagal, ini kemungkinan masalah CORS.');
+      enableUI(false);
+    }
+  }
+
+  // ====== Exports ======
+  function download(filename, mime, content){ const blob = new Blob([content], { type:mime }); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = filename; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href), 1000); }
+
+  function exportWorkbookFrom(data){ const ws = XLSX.utils.json_to_sheet(data); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, (sheetName||'Sheet1')); return wb; }
+
+  function exportXlsx(){ const wb = exportWorkbookFrom(filtered); XLSX.writeFile(wb, `export_${(sheetName||'data')}.xlsx`); }
+
+  function exportCsv(){ const ws = XLSX.utils.json_to_sheet(filtered); const csv = XLSX.utils.sheet_to_csv(ws); download(`export_${(sheetName||'data')}.csv`, 'text/csv;charset=utf-8', csv); }
+
+  function exportJson(){ const json = JSON.stringify(filtered, null, 2); download(`export_${(sheetName||'data')}.json`, 'application/json;charset=utf-8', json); }
+
+  function exportBase64(){ const wb = exportWorkbookFrom(filtered); const b64 = XLSX.write(wb, { bookType:'xlsx', type:'base64' }); el.b64Preview.textContent = b64.slice(0, 2000) + (b64.length>2000? '
+… (dipotong)':''); el.downloadB64.onclick = () => { download(`export_${(sheetName||'data')}.b64.txt`, 'text/plain;charset=utf-8', b64); }; el.copyB64.onclick = async () => { try { await navigator.clipboard.writeText(b64); toast('Base64 disalin ✅'); } catch(e){ toast('Gagal menyalin 😕'); } }; openModal(); }
+
+  // ------- Export PDF (jsPDF + autoTable) -------
+  function exportPdf(){
+    if(!filtered.length){ toast('Tidak ada data untuk diekspor'); return; }
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ orientation:'landscape', unit:'pt', format:'a4' });
+    const title = `Export ${(sheetName||'Data')} — ${new Date().toLocaleString('id-ID')}`;
+    doc.setFontSize(14); doc.text(title, 40, 40);
+    const head = [columns];
+    const body = filtered.map(row => columns.map(k => normalize(row[k])));
+    const pageW = doc.internal.pageSize.getWidth();
+
+    doc.autoTable({
+      head:[columns],
+      body,
+      startY:60,
+      styles:{ fontSize:8, cellPadding:3, overflow:'linebreak' },
+      headStyles:{ fillColor:[15,23,42], textColor:255 },
+      margin:{ left:40, right:40 },
+      didDrawPage: (data)=>{
+        const str = `Halaman ${doc.internal.getNumberOfPages()}`;
+        doc.setFontSize(9);
+        doc.text(str, pageW - 40, doc.internal.pageSize.getHeight() - 20, { align:'right' });
+      },
+    });
+
+    doc.save(`export_${(sheetName||'data')}.pdf`);
+  }
+
+  // ------- Print (native print → save as PDF) -------
+  function printPdf(){ window.print(); }
+
+  // ====== Modal ======
+  function openModal(){ el.modal.classList.add('active'); }
+  function closeModal(){ el.modal.classList.remove('active'); }
+  el.closeModal.addEventListener('click', closeModal);
+  el.modal.addEventListener('click', (ev)=>{ if(ev.target===el.modal) closeModal(); });
+
+  // ====== Toast (ringkas) ======
+  function toast(msg){ const n = document.createElement('div'); n.textContent = msg; Object.assign(n.style,{ position:'fixed', bottom:'18px', left:'50%', transform:'translateX(-50%)', background:'rgba(2,6,23,.9)', color:'var(--text)', padding:'10px 14px', border:'1px solid var(--border)', borderRadius:'12px', zIndex:60, boxShadow:'0 10px 30px rgba(0,0,0,.5)' }); document.body.appendChild(n); setTimeout(()=>{ n.style.transition='opacity .4s'; n.style.opacity='0'; setTimeout(()=>n.remove(), 400); }, 1600); }
+
+  // ====== Events ======
+  el.file.addEventListener('change', async (e)=>{
+    const f = e.target.files?.[0]; if(!f) return;
+    const ok = /(?:\.xlsx|\.xls|application\/vnd\.openxmlformats-officedocument\.spreadsheetml\.sheet|application\/vnd\.ms-excel)$/i.test(f.type) || /\.xlsx?$/i.test(f.name);
+    if(!ok){ toast('File bukan Excel (.xlsx/.xls)'); e.target.value = ''; return; }
+    enableUI(false); setLoading('Memuat data…');
+    try{ await loadWorkbookFromFile(f); toast('Berhasil memuat ✅'); }
+    catch(err){ console.error(err); toast('Gagal memuat file. Pastikan file tidak rusak.'); enableUI(false); }
+  });
+
+  el.loadUrlBtn.addEventListener('click', async ()=>{
+    const url = el.url.value.trim(); if(!url){ toast('Tempel URL terlebih dahulu'); return; }
+    await loadFromUrl(url);
+  });
+  el.url.addEventListener('keydown', async (ev)=>{ if(ev.key==='Enter'){ ev.preventDefault(); const url = el.url.value.trim(); if(url) await loadFromUrl(url); }});
+
+  el.sheet.addEventListener('change', async (e)=>{ const name = e.target.value; if(!name) return; page=1; currentSort={key:null, dir:'asc'}; await loadSheet(name); });
+
+  el.reset.addEventListener('click', ()=>{
+    workbook = null; sheetName = null; original = []; filtered = []; columns = [];
+    el.file.value = ''; el.url.value = ''; el.sheet.innerHTML = ''; el.thead.innerHTML=''; el.tbody.innerHTML=''; el.colFilters.innerHTML='';
+    el.q.value=''; page=1; currentSort={key:null, dir:'asc'}; enableUI(false);
+    el.statRows.textContent = '0'; el.statCols.textContent = '0'; el.statFiltered.textContent = '0'; el.pageInfo.textContent = 'Halaman 0 / 0';
+  });
+
+  el.q.addEventListener('input', debounce(()=>{ page=1; renderBody(); }));
+
+  el.pageSize.addEventListener('change', (e)=>{ pageSize = parseInt(e.target.value,10)||50; page=1; renderBody(); });
+  el.prev.addEventListener('click', ()=>{ if(page>1){ page--; renderBody(); } });
+  el.next.addEventListener('click', ()=>{ page++; renderBody(); });
+
+  el.exportXlsx.addEventListener('click', exportXlsx);
+  el.exportCsv.addEventListener('click', exportCsv);
+  el.exportJson.addEventListener('click', exportJson);
+  el.exportPdf.addEventListener('click', exportPdf);
+  el.printPdf.addEventListener('click', printPdf);
+  el.exportB64.addEventListener('click', exportBase64);
+
+  // Keyboard: PgUp/PgDn untuk paging cepat
+  window.addEventListener('keydown', (ev)=>{
+    if(!filtered.length) return;
+    if(ev.key==='PageDown'){ ev.preventDefault(); if(!el.next.disabled){ page++; renderBody(); } }
+    if(ev.key==='PageUp'){ ev.preventDefault(); if(!el.prev.disabled){ page--; renderBody(); } }
+  });
+})();
+</script>
+</body>
+</html>
